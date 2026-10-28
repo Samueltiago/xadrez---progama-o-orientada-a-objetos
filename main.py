@@ -1,17 +1,20 @@
 from xadrex_esqueleto import *
 from tabuleiro import *
+from jogador import *
 
 tabuleiro = Tabuleiro()
+tabuleiro.posicionar_pecas()
 
-tabuleiro.posicionar_peoes()
-
-tabuleiro.mover_peca(6,4,4,4)
-tabuleiro.mover_peca(1,3,2,3)
+jogador_branco = Jogador(True)
+jogador_preto = Jogador(False)
 
 tabuleiro.mostrar()
+print("\n")
 
-#teste
-tabuleiro.colocar_peca(Peao(3,3,False))
-tabuleiro.mostrar
-tabuleiro.mover_peca(4,4,3,3)
+jogador_branco.solicitar_movimento(tabuleiro)
+print("\n")
 tabuleiro.mostrar()
+print("\n")
+jogador_branco.solicitar_movimento(tabuleiro)
+tabuleiro.mostrar()
+print("\n")
