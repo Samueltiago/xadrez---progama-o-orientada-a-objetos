@@ -1,31 +1,33 @@
+
 from xadrex_esqueleto import *
+
 
 class Tabuleiro:
 
     def __init__(self):
-        self.casas = []
+        self.casas = [[None for _ in range(8)] for _ in range(8)]
 
-        for linha in range(8):
-            casas_linha = []
-            for coluna in range(8):
-                casas_linha.append(None)
-            self.casas.append(casas_linha)
+        self.ultima_jogada = None
 
-    def colocar_peca(self, Peca):
-            numeros,letras = Peca.getposicao()
-            if numeros < 0 or numeros > 7 or letras < 0 or letras > 7:
-                print("Posição invalido")
-                return
-   
-            if self.casas[numeros][letras] is not None:
-                print("Casa ja oculpada")
-                return    
-   
-            self.casas[numeros][letras] = Peca
-   
-    
+        self.turno_branco = True
+
+    def trocar_turno(self):
+        self.turno_branco = not self.turno_branco
+
+    def colocar_peca(self, peca):
+        numeros, letras = peca.getposicao()
+
+        if numeros < 0 or numeros > 7 or letras < 0 or letras > 7:
+            raise ValueError("Posição da peça inválida.")
+
+        if self.casas[numeros][letras] is not None:
+            raise ValueError("Já existe uma peça nessa posição.")
+
+        self.casas[numeros][letras] = peca
+
     def posicionar_pecas(self):
-        # Peças pretas: linha 0
+
+        # Peças pretas
         self.colocar_peca(Torre(0, 0, False))
         self.colocar_peca(Cavalo(0, 1, False))
         self.colocar_peca(Bispo(0, 2, False))
@@ -35,7 +37,7 @@ class Tabuleiro:
         self.colocar_peca(Cavalo(0, 6, False))
         self.colocar_peca(Torre(0, 7, False))
 
-        # Peças brancas: linha 7
+        # Peças brancas
         self.colocar_peca(Torre(7, 0, True))
         self.colocar_peca(Cavalo(7, 1, True))
         self.colocar_peca(Bispo(7, 2, True))
@@ -50,84 +52,209 @@ class Tabuleiro:
             self.colocar_peca(Peao(1, coluna, False))
             self.colocar_peca(Peao(6, coluna, True))
 
+    def mover_peca(self, numeros_origem, letras_origem,
+                   numeros_destino, letras_destino):
 
+        # Verifica se as coordenadas estão dentro do tabuleiro
+        if not (0 <= numeros_origem < 8 and 0 <= letras_origem < 8 and 0 <= numeros_destino < 8 and 0 <= letras_destino < 8):
+            raise ValueError("Posição fora do tabuleiro.")
 
-    def mover_peca(self, numeros_origem, letras_origem, numeros_destino, letras_destino,cor_jogador):
         peca = self.casas[numeros_origem][letras_origem]
 
+        # Verifica se existe uma peça na origem
         if peca is None:
-            print("Não há peça nessa casa")
-            return
+            raise ValueError("Não existe peça nessa posição.")
 
-        if (numeros_destino, letras_destino) not in peca.movimento(self):
-            print("Movimento inválido")
-            return
+        # Verifica se a peça pertence ao jogador da vez
+        if peca.getcor() != self.turno_branco:
+            raise ValueError("Essa peça não pertence ao jogador da vez.")
 
-        if cor_jogador is not None and peca.getcor() != cor_jogador:
-            print("Essa peça não pertence a você")
-            return
+        movimentos_possiveis = peca.movimento(self)
+
+        if (numeros_destino, letras_destino) not in movimentos_possiveis:
+            raise ValueError("Movimento inválido.")
+
+       
+        #confirmando se a casa que o rei esta indo esta atacada
+        peca_destino_original = self.casas[numeros_destino][letras_destino]
+
+        pos_antiga_numeros, pos_antiga_letras = peca.getposicao()
 
         self.casas[numeros_origem][letras_origem] = None
         self.casas[numeros_destino][letras_destino] = peca
-        
+
         peca.setposicao(numeros_destino, letras_destino)
 
+        proprio_rei_em_xeque = self.esta_em_xeque(peca.getcor())
 
-    def posicao_para_coordenadas(self, posicao):
-        posicao = posicao.strip().upper()
-
-        if len(posicao) != 2:
-            return None
-
-        coluna = posicao[0]
-        linha = posicao[1]
-
-        if coluna not in "ABCDEFGH" or linha not in "12345678":
-            return None
-
-        letras = ord(coluna) - ord("A")
-        numeros = 8 - int(linha)
-
-        return numeros,letras
-
-        
     
-    def mostrar(self):
-        print("   A  B  C  D  E  F  G  H")
+        peca.setposicao(pos_antiga_numeros, pos_antiga_letras)
 
-        numero = 8
+        self.casas[numeros_origem][letras_origem] = peca
+        self.casas[numeros_destino][letras_destino] = peca_destino_original
 
-        for linha in self.casas:
-            print(numero, end="  ")
+        if proprio_rei_em_xeque:
+            raise ValueError("Esse movimento deixa seu Rei em xeque.")
 
-            for casa in linha:
-                if casa is None:
-                    print("..", end=" ")
-                else:
-                
-                    nome_peca = type(casa).__name__
+        # --------------------------------------------------
+        # ROQUE
+        # --------------------------------------------------
 
-                    siglas = {
-                        "Peao": "P",
-                        "Cavalo": "C",
-                        "Bispo": "B",
-                        "Torre": "T",
-                        "Rainha": "R",
-                        "Rei": "K"
-                    }
+        if type(peca).__name__ == "Rei" and abs(letras_destino - letras_origem) == 2:
 
-                
-                    letra = siglas.get(nome_peca, "?")
+            coluna_torre_origem = 7 if letras_destino > letras_origem else 0
 
-                
-                    if casa.getcor():
-                        cor = "B" 
+            coluna_torre_destino = (
+                letras_destino - 1
+                if letras_destino > letras_origem
+                else letras_destino + 1
+            )
+
+            torre = self.casas[numeros_origem][coluna_torre_origem]
+
+            self.casas[numeros_origem][coluna_torre_origem] = None
+            self.casas[numeros_origem][coluna_torre_destino] = torre
+
+            if torre:
+                torre.setposicao(numeros_origem, coluna_torre_destino)
+                torre.foi_movida = True
+
+        # --------------------------------------------------
+        # EN PASSANT
+        # --------------------------------------------------
+
+        if (type(peca).__name__ == "Peao" and
+                letras_origem != letras_destino and
+                self.casas[numeros_destino][letras_destino] is None):
+
+            self.casas[numeros_origem][letras_destino] = None
+
+        self.casas[numeros_origem][letras_origem] = None
+        self.casas[numeros_destino][letras_destino] = peca
+
+        peca.setposicao(numeros_destino, letras_destino)
+
+        if hasattr(peca, "foi_movida"):
+            peca.foi_movida = True
+
+        self.ultima_jogada = (
+            numeros_origem,
+            letras_origem,
+            numeros_destino,
+            letras_destino,
+            peca
+        )
+
+        self.trocar_turno()
+
+    def encontrar_rei(self, cor):
+
+        for numeros in range(8):
+            for letras in range(8):
+
+                peca = self.casas[numeros][letras]
+
+                if (peca and
+                        type(peca).__name__ == "Rei" and
+                        peca.getcor() == cor):
+
+                    return numeros, letras
+
+        raise ValueError("Rei não encontrado no tabuleiro.")
+
+    def casa_esta_atacada(self, linha_alvo, coluna_alvo, cor_atacante):
+
+        for numeros in range(8):
+            for letras in range(8):
+
+                peca = self.casas[numeros][letras]
+
+                if peca and peca.getcor() == cor_atacante:
+
+                    # Ataque do Rei
+                    if type(peca).__name__ == "Rei":
+
+                        if max(
+                            abs(numeros - linha_alvo),
+                            abs(letras - coluna_alvo)
+                        ) == 1:
+
+                            return True
+
+ 
+                    elif type(peca).__name__ == "Peao":
+
+                        direcao = -1 if peca.getcor() else 1
+
+                        if (linha_alvo == numeros + direcao and
+                                abs(coluna_alvo - letras) == 1):
+
+                            return True
+
+                    # Ataque das outras peças
                     else:
-                        cor = "P"  
 
-                    print(letra + cor, end=" ")
+                        if (linha_alvo, coluna_alvo) in peca.movimento(self):
+                            return True
 
-            print(" ", numero)
-            numero -= 1
+        return False
 
-        print("   A  B  C  D  E  F  G  H")
+
+    def esta_em_xeque(self, cor):
+
+        pos_rei = self.encontrar_rei(cor)
+
+        return self.casa_esta_atacada(
+            pos_rei[0],
+            pos_rei[1],
+            not cor
+        )
+
+    def simular_movimento_salva_xeque(
+            self, numeros_origem, letras_origem,
+            numeros_destino, letras_destino, cor):
+
+        peca_origem = self.casas[numeros_origem][letras_origem]
+        peca_destino = self.casas[numeros_destino][letras_destino]
+
+        pos_antiga = peca_origem.getposicao()
+
+        self.casas[numeros_origem][letras_origem] = None
+        self.casas[numeros_destino][letras_destino] = peca_origem
+
+        peca_origem.setposicao(numeros_destino, letras_destino)
+
+        xeque = self.esta_em_xeque(cor)
+
+        # Restaura o tabuleiro
+        peca_origem.setposicao(pos_antiga[0], pos_antiga[1])
+
+        self.casas[numeros_origem][letras_origem] = peca_origem
+        self.casas[numeros_destino][letras_destino] = peca_destino
+
+        return not xeque
+
+    def esta_em_xeque_mate(self, cor):
+
+        if not self.esta_em_xeque(cor):
+            return False
+
+        for numeros_origem in range(8):
+            for letras_origem in range(8):
+
+                peca = self.casas[numeros_origem][letras_origem]
+
+                if peca and peca.getcor() == cor:
+
+                    for numeros_destino, letras_destino in peca.movimento(self):
+
+                        if self.simular_movimento_salva_xeque(
+                                numeros_origem,
+                                letras_origem,
+                                numeros_destino,
+                                letras_destino,
+                                cor):
+
+                            return False
+
+        return True
