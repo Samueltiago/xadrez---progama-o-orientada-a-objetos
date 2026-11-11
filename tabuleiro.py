@@ -1,15 +1,24 @@
-
 from xadrex_esqueleto import *
 
 
 class Tabuleiro:
 
+    PECAS_PROMOCAO = {
+        "Rainha": Rainha,
+        "Torre": Torre,
+        "Bispo": Bispo,
+        "Cavalo": Cavalo,
+    }
+    
     def __init__(self):
         self.casas = [[None for _ in range(8)] for _ in range(8)]
 
         self.ultima_jogada = None
 
         self.turno_branco = True
+
+        self.aguardando_promocao = False
+        self.casa_promocao = (-1, -1)
 
     def trocar_turno(self):
         self.turno_branco = not self.turno_branco
@@ -54,6 +63,9 @@ class Tabuleiro:
 
     def mover_peca(self, numeros_origem, letras_origem,
                    numeros_destino, letras_destino):
+
+        if self.aguardando_promocao:
+            raise ValueError("Escolha a peça da promoção antes de continuar.")
 
         # Verifica se as coordenadas estão dentro do tabuleiro
         if not (0 <= numeros_origem < 8 and 0 <= letras_origem < 8 and 0 <= numeros_destino < 8 and 0 <= letras_destino < 8):
@@ -145,7 +157,31 @@ class Tabuleiro:
             peca
         )
 
+        self.ultima_jogada = (numeros_origem, letras_origem, numeros_destino, letras_destino, peca)
+
+        if (type(peca).__name__ == "Peao" and
+                numeros_destino == (0 if peca.getcor() else 7)):
+            self.aguardando_promocao = True
+            self.casa_promocao = (numeros_destino, letras_destino)
+
         self.trocar_turno()
+
+    def promover_peao(self, nome_peca):
+        if not self.aguardando_promocao:
+            raise ValueError("Não há peão para promover.")
+
+        if nome_peca not in self.PECAS_PROMOCAO:
+            raise ValueError("Peça inválida para promoção.")
+
+        linha, coluna = self.casa_promocao
+        cor = self.casas[linha][coluna].getcor()
+
+        nova_peca = self.PECAS_PROMOCAO[nome_peca](linha, coluna, cor)
+        nova_peca.foi_movida = True
+
+        self.casas[linha][coluna] = nova_peca
+        self.aguardando_promocao = False
+
 
     def encontrar_rei(self, cor):
 
